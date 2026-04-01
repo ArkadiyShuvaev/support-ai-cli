@@ -1,0 +1,9 @@
+node_modules/*
+dist/*
+coverage/*
+*.log
+*.tmp
+*.env
+data-pipeline/data/raw/
+docs/examples/
+.env

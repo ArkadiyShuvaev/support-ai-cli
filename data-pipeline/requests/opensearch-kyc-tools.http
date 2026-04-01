@@ -1,0 +1,141 @@
+@baseUrl = http://localhost:9200
+@index = support-cli-tools
+
+// ── Inspect mapping ──────────────────────────────────────────────────────────
+GET {{baseUrl}}/{{index}}/_mapping
+
+
+// ── Index stats ───────────────────────────────────────────────────────────────
+GET {{baseUrl}}/{{index}}/_count
+
+
+// ── Sample documents (first 5) ───────────────────────────────────────────────
+GET {{baseUrl}}/{{index}}/_search
+Content-Type: application/json
+
+{
+  "size": 5,
+  "_source": ["id", "server", "name", "description"]
+}
+
+
+// ── Fetch document by id (format: <server>__<tool_name>) ─────────────────────
+GET {{baseUrl}}/{{index}}/_doc/<SERVER>__<TOOL_NAME>
+
+
+// ── List all available servers ────────────────────────────────────────────────
+GET {{baseUrl}}/{{index}}/_search
+Content-Type: application/json
+
+{
+  "size": 0,
+  "aggs": {
+    "servers": {
+      "terms": {
+        "field": "server",
+        "size": 50
+      }
+    }
+  }
+}
+
+
+// ── List all tools for a specific server ──────────────────────────────────────
+GET {{baseUrl}}/{{index}}/_search
+Content-Type: application/json
+
+{
+  "size": 100,
+  "query": {
+    "term": {
+      "server": "<SERVER_NAME>"
+    }
+  },
+  "_source": ["id", "name", "description"]
+}
+
+
+// ── BM25 full-text search (tool name + description + input schema) ────────────
+GET {{baseUrl}}/{{index}}/_search
+Content-Type: application/json
+
+{
+  "size": 5,
+  "query": {
+    "multi_match": {
+      "query": "get company profile",
+      "fields": ["name^3", "description", "description.en", "description.fr", "input_schema_json"],
+      "type": "best_fields"
+    }
+  },
+  "_source": ["id", "server", "name", "description"]
+}
+
+
+// ── kNN vector search (replace the 512-dim array with a real embedding) ───────
+GET {{baseUrl}}/{{index}}/_search
+Content-Type: application/json
+
+{
+  "size": 5,
+  "query": {
+    "knn": {
+      "embedding": {
+        "vector": [],
+        "k": 5
+      }
+    }
+  },
+  "_source": ["id", "server", "name", "description"]
+}
+
+
+// ── Hybrid BM25 + kNN ─────────────────────────────────────────────────────────
+GET {{baseUrl}}/{{index}}/_search
+Content-Type: application/json
+
+{
+  "size": 5,
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "multi_match": {
+            "query": "get company profile",
+            "fields": ["name^3", "description", "input_schema_json"],
+            "type": "best_fields"
+          }
+        }
+      ],
+      "should": [
+        {
+          "knn": {
+            "embedding": {
+              "vector": [],
+              "k": 5
+            }
+          }
+        }
+      ]
+    }
+  },
+  "_source": ["id", "server", "name", "description"]
+}
+
+
+// ── Check input_schema_json for a specific tool ───────────────────────────────
+GET {{baseUrl}}/{{index}}/_search
+Content-Type: application/json
+
+{
+  "size": 1,
+  "query": {
+    "bool": {
+      "must": [
+        { "term": { "server": "<SERVER_NAME>" } },
+        { "term": { "name.keyword": "<TOOL_NAME>" } }
+      ]
+    }
+  },
+  "_source": ["id", "name", "description", "input_schema_json"]
+}

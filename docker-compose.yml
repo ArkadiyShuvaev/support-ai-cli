@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: support-cli-opensearch
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - bootstrap.memory_lock=true
+      - 'indices.query.bool.max_clause_count=4096'
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - '9200:9200'
+      - '9600:9600'
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+
+  embedding:
+    build:
+      context: ./data-pipeline
+      dockerfile: Dockerfile
+    container_name: support-cli-embedding
+    environment:
+      - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-distiluse-base-multilingual-cased-v1}
+    ports:
+      - '8001:8001'
+    volumes:
+      # Cache the downloaded model across restarts — avoids re-downloading 260 MB on every up.
+      - hf-cache:/root/.cache/huggingface
+
+volumes:
+  opensearch-data:
+  hf-cache:

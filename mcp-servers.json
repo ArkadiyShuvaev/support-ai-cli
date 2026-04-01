@@ -1,0 +1,27 @@
+{
+  "servers": {
+    "sentry": {
+      "command": "npx",
+      "args": ["-y", "@sentry/mcp-server@latest", "--disable-skills=seer"],
+      "env": {
+        "SENTRY_ACCESS_TOKEN": "${SENTRY_ACCESS_TOKEN}"
+      },
+      "description": "Sentry - error tracking and monitoring tools"
+    },
+    "linear": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp.linear.app/mcp"],
+      "description": "Linear issue tracker - ticket management, project and comment tools"
+    },
+    "notion": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp.notion.com/mcp"],
+      "description": "Notion knowledge base - page search and document fetch tools"
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "description": "GitHub - repository, pull request, issue and code search tools"
+    }
+  }
+}

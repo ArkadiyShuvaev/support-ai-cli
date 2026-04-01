@@ -1,0 +1,108 @@
+@baseUrl = http://localhost:9200
+@index = support-cli-kb
+
+// ── Inspect mapping ──────────────────────────────────────────────────────────
+GET {{baseUrl}}/{{index}}/_mapping
+
+
+// ── Index stats ───────────────────────────────────────────────────────────────
+GET {{baseUrl}}/{{index}}/_count
+
+
+// ── Sample documents (first 5) ───────────────────────────────────────────────
+GET {{baseUrl}}/{{index}}/_search
+Content-Type: application/json
+
+{
+  "size": 5,
+  "_source": ["id", "title", "page_ref"]
+}
+
+
+// ── Fetch document by id ─────────────────────────────────────────────────────
+GET {{baseUrl}}/{{index}}/_doc/<DOCUMENT_ID>
+
+
+// ── BM25 full-text search ─────────────────────────────────────────────────────
+GET {{baseUrl}}/{{index}}/_search
+Content-Type: application/json
+
+{
+  "size": 5,
+  "query": {
+    "multi_match": {
+      "query": "Support CLI verification",
+      "fields": ["title^3", "title.en^2", "title.fr^2", "content", "content.en", "content.fr"],
+      "type": "best_fields"
+    }
+  },
+  "_source": ["id", "title", "page_ref"]
+}
+
+
+// ── kNN vector search (replace the 512-dim array with a real embedding) ───────
+GET {{baseUrl}}/{{index}}/_search
+Content-Type: application/json
+
+{
+  "size": 5,
+  "query": {
+    "knn": {
+      "embedding": {
+        "vector": [],
+        "k": 5
+      }
+    }
+  },
+  "_source": ["id", "title", "page_ref"]
+}
+
+
+// ── Hybrid BM25 + kNN (bool must + knn) ───────────────────────────────────────
+GET {{baseUrl}}/{{index}}/_search
+Content-Type: application/json
+
+{
+  "size": 5,
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "multi_match": {
+            "query": "Support CLI verification",
+            "fields": ["title^3", "content"],
+            "type": "best_fields"
+          }
+        }
+      ],
+      "should": [
+        {
+          "knn": {
+            "embedding": {
+              "vector": [],
+              "k": 5
+            }
+          }
+        }
+      ]
+    }
+  },
+  "_source": ["id", "title", "page_ref"]
+}
+
+
+// ── Unique page_ref values ─────────────────────────────────────────────────────
+GET {{baseUrl}}/{{index}}/_search
+Content-Type: application/json
+
+{
+  "size": 0,
+  "aggs": {
+    "unique_page_refs": {
+      "terms": {
+        "field": "page_ref",
+        "size": 20
+      }
+    }
+  }
+}
