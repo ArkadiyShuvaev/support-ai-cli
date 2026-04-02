@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import random
 
@@ -16,6 +17,8 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 load_dotenv(find_dotenv())
+
+logger = logging.getLogger(__name__)
 
 # mcp-servers.json lives at the project root:
 # shared/ -> indexer/ -> data-pipeline/ -> project root
@@ -90,8 +93,8 @@ async def call_tool_with_retry(
                 raise
             jitter = random.uniform(0, delay * 0.2)
             wait = min(delay + jitter, _BACKOFF_MAX)
-            print(f"  ⚠️  Tool call failed (attempt {attempt + 1}/{max_retries}): {exc}")
-            print(f"  ⏳ Retrying in {wait:.1f}s...")
+            logger.warning("⚠️  Tool call failed (attempt %d/%d): %s", attempt + 1, max_retries, exc)
+            logger.info("⏳ Retrying in %.1fs...", wait)
             await asyncio.sleep(wait)
             delay = min(delay * 2, _BACKOFF_MAX)
     raise RuntimeError("Unreachable")  # satisfies type checkers

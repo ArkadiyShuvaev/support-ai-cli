@@ -14,10 +14,13 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import boto3
 
 from dotenv import find_dotenv, load_dotenv
+
+from shared.logger import get_logger
+
+logger = get_logger(__name__, log_file="translate_articles")
 
 load_dotenv(find_dotenv())
 
@@ -71,7 +74,7 @@ def main() -> None:
     with open(_RAW_PATH, encoding="utf-8") as f:
         articles: list[dict] = json.load(f)
 
-    print(f"📖 Loaded {len(articles)} articles from {_RAW_PATH}")
+    logger.info("📖 Loaded %d articles from %s", len(articles), _RAW_PATH)
 
     client = boto3.client("bedrock-runtime", region_name=_AWS_REGION)
 
@@ -79,24 +82,21 @@ def main() -> None:
     changed_count = 0
 
     for idx, article in enumerate(articles, 1):
-        article_id = article.get("id", f"article-{idx}")
         title = article.get("title", "")
         content = article.get("content", "")
-
-        print(f"[{idx:>3}/{len(articles)}] {title[:60]}", end=" ... ", flush=True)
 
         try:
             translated_content, was_changed = _translate_content(client, content)
         except Exception as exc:
-            print(f"❌ FAILED ({exc})")
+            logger.error("[%3d/%d] %s ... ❌ FAILED: %s", idx, len(articles), title[:60], exc)
             translated_articles.append(article)
             continue
 
         if was_changed:
             changed_count += 1
-            print("✅ translated")
+            logger.info("[%3d/%d] %s ... ✅ translated", idx, len(articles), title[:60])
         else:
-            print("⏭  no French detected")
+            logger.info("[%3d/%d] %s ... ⏭  no French detected", idx, len(articles), title[:60])
 
         translated_articles.append({**article, "content": translated_content})
 
@@ -104,8 +104,8 @@ def main() -> None:
     with open(_OUT_PATH, "w", encoding="utf-8") as f:
         json.dump(translated_articles, f, indent=2, ensure_ascii=False)
 
-    print(f"\n💾 Saved {len(translated_articles)} articles to {_OUT_PATH}")
-    print(f"   {changed_count} article(s) had French content translated.")
+    logger.info("💾 Saved %d articles to %s", len(translated_articles), _OUT_PATH)
+    logger.info("   %d article(s) had French content translated.", changed_count)
 
 
 if __name__ == "__main__":

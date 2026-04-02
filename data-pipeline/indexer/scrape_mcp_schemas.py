@@ -13,13 +13,15 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import sys
 from argparse import ArgumentParser
 
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
 
+from shared.logger import get_logger
 from shared.mcp_client import load_all_server_names, load_server_params
+
+logger = get_logger(__name__, log_file="scrape_mcp_schemas")
 
 _SCHEMAS_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "mcp_schemas")
 
@@ -27,12 +29,12 @@ _SCHEMAS_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "mcp
 async def _fetch_schemas(server_name: str) -> dict[str, dict]:
     """Connect to a single MCP server and return all tool schemas."""
     server_params = load_server_params(server_name)
-    print(f"🔌 Connecting to '{server_name}' MCP server...")
+    logger.info("🔌 Connecting to '%s' MCP server...", server_name)
 
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            print(f"  ✅ Connected. Fetching tool list...")
+            logger.info("  ✅ Connected. Fetching tool list...")
 
             tools_response = await session.list_tools()
 
@@ -43,7 +45,7 @@ async def _fetch_schemas(server_name: str) -> dict[str, dict]:
                     "inputSchema": tool.inputSchema,
                 }
 
-            print(f"  📦 Found {len(schemas)} tools on '{server_name}'")
+            logger.info("  📦 Found %d tools on '%s'", len(schemas), server_name)
             return schemas
 
 
@@ -59,14 +61,14 @@ async def _scrape_all(server_names: list[str]) -> None:
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(schemas, f, indent=2, ensure_ascii=False)
 
-            print(f"  💾 Saved to {output_path}\n")
+            logger.info("  💾 Saved to %s", output_path)
             success_count += 1
         except Exception as exc:
-            print(f"  ❌ Failed to scrape '{server_name}': {exc}\n", file=sys.stderr)
+            logger.error("  ❌ Failed to scrape '%s': %s", server_name, exc)
 
-    print(f"{'─' * 60}")
-    print(f"  {success_count}/{len(server_names)} server(s) scraped successfully.")
-    print(f"{'─' * 60}")
+    logger.info("─" * 60)
+    logger.info("  %d/%d server(s) scraped successfully.", success_count, len(server_names))
+    logger.info("─" * 60)
 
 
 def main() -> None:
@@ -82,7 +84,7 @@ def main() -> None:
     args = parser.parse_args()
 
     server_names: list[str] = args.servers or load_all_server_names()
-    print(f"🎯 Scraping schemas for: {', '.join(server_names)}\n")
+    logger.info("🎯 Scraping schemas for: %s", ", ".join(server_names))
 
     asyncio.run(_scrape_all(server_names))
 

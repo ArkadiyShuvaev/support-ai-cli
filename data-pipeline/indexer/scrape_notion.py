@@ -9,11 +9,14 @@ from dotenv import find_dotenv, load_dotenv
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
 
+from shared.logger import get_logger
 from shared.mcp_client import (
     call_tool as _call_tool,
     call_tool_with_retry as _call_tool_with_retry,
     load_server_params,
 )
+
+logger = get_logger(__name__, log_file="scrape_notion")
 
 load_dotenv(find_dotenv())
 
@@ -36,7 +39,7 @@ def _slug(title: str) -> str:
 def parse_page(raw: str, page_ref: str, parent_db_id: str) -> dict | None:
     # 1. Strict Verification: Ensure the page actually belongs to the KB database
     if parent_db_id not in raw:
-        print(f"  ⏭️  Skipped (Outside of KB Database): {page_ref}")
+        logger.info("⏭️  Skipped (Outside of KB Database): %s", page_ref)
         return None
 
     text = raw
@@ -66,12 +69,12 @@ def parse_page(raw: str, page_ref: str, parent_db_id: str) -> dict | None:
 
 async def _fetch_categories(session: ClientSession, parent_page_id: str) -> list[str]:
     """Extracts Options from Feature, Scope, and Topic to cast the widest search net."""
-    print("⚙️  Fetching database schema to determine search categories...")
+    logger.info("⚙️  Fetching database schema to determine search categories...")
     raw = await _call_tool(session, "notion-fetch", {"id": parent_page_id})
 
     match = re.search(r"<data-source-state>\s*(.*?)\s*</data-source-state>", raw, re.DOTALL)
     if not match:
-        print("⚠️ Could not find <data-source-state> in the KB page.")
+        logger.warning("⚠️ Could not find <data-source-state> in the KB page.")
         return []
 
     try:
@@ -96,11 +99,11 @@ async def _fetch_categories(session: ClientSession, parent_page_id: str) -> list
                 if opt.get("name"):
                     categories.add(opt.get("name"))
 
-        print(f"✅ Dynamically loaded {len(categories)} total search vectors from Notion.")
+        logger.info("✅ Dynamically loaded %d total search vectors from Notion.", len(categories))
         return list(categories)
 
     except Exception as e:
-        print(f"⚠️ Failed to parse data-source-state JSON: {e}")
+        logger.warning("⚠️ Failed to parse data-source-state JSON: %s", e)
         return []
 
 
@@ -125,46 +128,46 @@ async def _scrape() -> list[dict]:
     async with stdio_client(load_server_params("notion")) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            print("✅ Connected to Notion MCP")
+            logger.info("✅ Connected to Notion MCP")
 
             categories = await _fetch_categories(session, parent_id)
 
             if not categories:
-                print("❌ No categories found to chunk searches. Exiting.")
+                logger.error("❌ No categories found to chunk searches. Exiting.")
                 return []
 
             # ⏳ RATE LIMIT PROTECTION
             await asyncio.sleep(2.0)
 
-            print(f"🔎 Searching inside parent page: {parent_id}")
+            logger.info("🔎 Searching inside parent page: %s", parent_id)
             seen: set[str] = set()
             for category in categories:
                 try:
                     page_ids = await _search_page_refs(session, parent_id, category)
-                    print(f"  -> Category '{category}': Found {len(page_ids)} pages")
+                    logger.info("  -> Category '%s': Found %d pages", category, len(page_ids))
                     seen.update(page_ids)
                 except Exception as e:
-                    print(f"⚠️ Failed searching category '{category}': {e}")
+                    logger.warning("⚠️ Failed searching category '%s': %s", category, e)
                 # ⏳ RATE LIMIT PROTECTION: Wait 2 seconds before the next search
                 await asyncio.sleep(2.0)
 
             page_refs = list(seen)
-            print(f"✅ Total unique pages discovered: {len(page_refs)}")
+            logger.info("✅ Total unique pages discovered: %d", len(page_refs))
 
-            print("📥 Beginning full Markdown fetch...")
+            logger.info("📥 Beginning full Markdown fetch...")
             for idx, page_ref in enumerate(page_refs, 1):
                 try:
                     raw = await _call_tool_with_retry(session, "notion-fetch", {"id": page_ref})
-                    article = parse_page(raw, page_ref, parent_id) 
+                    article = parse_page(raw, page_ref, parent_id)
 
                     if article is None:
                         continue
 
                     articles.append(article)
-                    print(f"  ✅ Fetched [{idx}/{len(page_refs)}]: {article['title']}")
+                    logger.info("  ✅ Fetched [%d/%d]: %s", idx, len(page_refs), article["title"])
 
                 except Exception as exc:
-                    print(f"  ❌ Permanently failed on {page_ref}: {exc}")
+                    logger.error("  ❌ Permanently failed on %s: %s", page_ref, exc)
 
                 # ⏳ RATE LIMIT PROTECTION: Wait 1.5 seconds between fetching pages
                 await asyncio.sleep(1.5)
@@ -176,10 +179,10 @@ def get_articles() -> list[dict]:
     try:
         articles = asyncio.run(_scrape())
         if not articles:
-            print("⚠️  No articles met the criteria.")
+            logger.warning("⚠️  No articles met the criteria.")
         return articles
     except Exception as exc:
-        print(f"⚠️  Notion MCP unavailable ({exc}).")
+        logger.error("⚠️  Notion MCP unavailable: %s", exc)
         return []
 
 
@@ -190,21 +193,21 @@ if __name__ == "__main__":
     articles = get_articles()
 
     if not articles:
-        print("No articles found.", file=sys.stderr)
+        logger.error("No articles found.")
         sys.exit(1)
 
-    print(f"\n{'─' * 60}")
-    print(f"  {len(articles)} article(s) loaded")
-    print(f"{'─' * 60}\n")
+    logger.info("─" * 60)
+    logger.info("  %d article(s) loaded", len(articles))
+    logger.info("─" * 60)
 
     os.makedirs(_DATA_DIR, exist_ok=True)
     output_path = os.path.join(_DATA_DIR, "notion_kb_export.json")
 
     if os.path.exists(output_path):
         shutil.copy2(output_path, output_path + ".bkp")
-        print(f"📦 Backed up previous export to {output_path}.bkp")
+        logger.info("📦 Backed up previous export to %s.bkp", output_path)
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(articles, f, indent=2, ensure_ascii=False)
 
-    print(f"💾 Successfully exported articles to {output_path}")
+    logger.info("💾 Successfully exported articles to %s", output_path)
