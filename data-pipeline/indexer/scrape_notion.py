@@ -115,7 +115,7 @@ async def _search_page_refs(session: ClientSession, parent_page_id: str, categor
     raw = await _call_tool_with_retry(session, "notion-search", search_args)
     response_json = json.loads(raw)
     results = response_json.get("results", [])
-    return [item["id"] for item in results if item.get("type") == "page" and item.get("id")]
+    return [_extract_page_id(item["id"]) for item in results if item.get("type") == "page" and item.get("id")]
 
 
 async def _scrape() -> list[dict]:
