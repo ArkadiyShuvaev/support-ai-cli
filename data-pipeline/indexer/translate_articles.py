@@ -5,9 +5,9 @@ Reads:  data/raw/notion_articles/notion_kb_export.json
 Writes: data/interim/notion_kb_translated.json
 
 Strategy: AWS Bedrock (Converse API) per article.
-- LLM identifies French sentences and translates them to English in-place.
-- Preserves all HTML-like markup, SQL/code blocks, URLs, and English text.
-- Articles with no French text are passed through unchanged.
+- LLM identifies French sentences and returns a list of {origin, translated} pairs.
+- Articles with no French text get an empty translations list.
+- Output is intended for manual review and in-place replacement.
 """
 
 from __future__ import annotations
@@ -35,23 +35,24 @@ _AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 _MODEL_ID = "anthropic.claude-haiku-4-5-20251001"
 
 _SYSTEM_PROMPT = (
-    "You are a technical translator. Your only task is to translate French text to English. "
+    "You are a technical translator. Your only task is to identify French text and translate it to English.\n"
     "Rules:\n"
-    "1. Identify every sentence or phrase written in French.\n"
-    "2. Replace each French passage with its English translation, in-place.\n"
-    "3. Preserve ALL of the following exactly as-is: HTML/XML-like tags "
-    "(e.g. <callout>, <empty-block>, <mention-user>), SQL code blocks, "
-    "markdown code fences (```), URLs, and any text already in English.\n"
-    "4. Do NOT add explanations, comments, or any wrapper around your output.\n"
-    "5. If the input contains NO French text, return it completely unchanged.\n"
-    "6. Output only the translated content — nothing else."
+    "1. Find every sentence or phrase written in French in the input.\n"
+    "2. For each French passage, produce one JSON object with two keys:\n"
+    '   - "origin": the original French text, copied exactly as it appears.\n'
+    '   - "translated": the English translation.\n'
+    "3. Return ONLY a JSON array of these objects — no prose, no markdown fences, no extra keys.\n"
+    "4. Skip HTML/XML-like tags, SQL/code blocks, URLs, and any text already in English.\n"
+    "5. If there is NO French text in the input, return an empty JSON array: []\n"
+    "Example output:\n"
+    '[{"origin": "Bonjour le monde", "translated": "Hello world"}]'
 )
 
 
-def _translate_content(client, content: str) -> tuple[str, bool]:
+def _extract_translations(client, content: str) -> list[dict]:
     """
-    Call Bedrock to translate French portions of `content`.
-    Returns (translated_content, was_changed).
+    Call Bedrock to extract French→English translation pairs from `content`.
+    Returns a list of {"origin": ..., "translated": ...} dicts (empty if no French found).
     """
     response = client.converse(
         modelId=_MODEL_ID,
@@ -61,13 +62,16 @@ def _translate_content(client, content: str) -> tuple[str, bool]:
     )
 
     output_blocks = response.get("output", {}).get("message", {}).get("content", [])
-    translated = next(
-        (b["text"] for b in output_blocks if "text" in b),
-        content,  # fallback: return original if something goes wrong
-    )
+    raw = next((b["text"] for b in output_blocks if "text" in b), "[]")
 
-    was_changed = translated.strip() != content.strip()
-    return translated, was_changed
+    try:
+        pairs = json.loads(raw)
+        if isinstance(pairs, list):
+            return pairs
+    except json.JSONDecodeError:
+        logger.warning("Could not parse Bedrock response as JSON: %s", raw[:200])
+
+    return []
 
 
 def main() -> None:
@@ -86,26 +90,26 @@ def main() -> None:
         content = article.get("content", "")
 
         try:
-            translated_content, was_changed = _translate_content(client, content)
+            translations = _extract_translations(client, content)
         except Exception as exc:
             logger.error("[%3d/%d] %s ... ❌ FAILED: %s", idx, len(articles), title[:60], exc)
-            translated_articles.append(article)
+            translated_articles.append({**article, "translations": []})
             continue
 
-        if was_changed:
+        if translations:
             changed_count += 1
-            logger.info("[%3d/%d] %s ... ✅ translated", idx, len(articles), title[:60])
+            logger.info("[%3d/%d] %s ... ✅ %d pair(s) found", idx, len(articles), title[:60], len(translations))
         else:
             logger.info("[%3d/%d] %s ... ⏭  no French detected", idx, len(articles), title[:60])
 
-        translated_articles.append({**article, "content": translated_content})
+        translated_articles.append({**article, "translations": translations})
 
     os.makedirs(_INTERIM_DIR, exist_ok=True)
     with open(_OUT_PATH, "w", encoding="utf-8") as f:
         json.dump(translated_articles, f, indent=2, ensure_ascii=False)
 
     logger.info("💾 Saved %d articles to %s", len(translated_articles), _OUT_PATH)
-    logger.info("   %d article(s) had French content translated.", changed_count)
+    logger.info("   %d article(s) had French content detected.", changed_count)
 
 
 if __name__ == "__main__":
