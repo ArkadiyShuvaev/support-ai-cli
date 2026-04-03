@@ -37,16 +37,19 @@ uv run python indexer/scrape_notion.py
 
 ---
 
-### 2. Filter — `indexer/filter_empty_articles.py`
+### 2. Clean — `indexer/clean_articles.py`
 
-Removes blank pages (tagged `<blank-page>` by the MCP scraper) and any manually excluded articles
-from the raw export.
+Filters and sanitizes the raw export:
+- Drops blank pages (tagged `<blank-page>` by the MCP scraper)
+- Drops manually excluded articles (by `page_ref` ID)
+- Strips Notion template boilerplate (`<callout>`, `<empty-block/>`, repetitive template instructions)
+- Collapses excessive whitespace left behind by removed tags
 
 - **Input:** `data/raw/notion_articles/notion_kb_export.json`
-- **Output:** `data/interim/notion_articles/notion_kb_filtered.json`
+- **Output:** `data/interim/notion_articles/notion_kb_cleaned.json`
 
 ```bash
-uv run python indexer/filter_empty_articles.py
+uv run python indexer/clean_articles.py
 ```
 
 To permanently exclude specific articles, add their `page_ref` IDs (one per line) to
@@ -65,7 +68,7 @@ To permanently exclude specific articles, add their `page_ref` IDs (one per line
 Detects French sentences in the scraped articles and translates them to English in-place using
 AWS Bedrock (Claude). Skip this step if the KB is already fully in English.
 
-- **Input:** `data/interim/notion_articles/notion_kb_filtered.json`
+- **Input:** `data/interim/notion_articles/notion_kb_cleaned.json`
 - **Output:** `data/interim/notion_articles/notion_kb_translated.json`
 
 Preserves all Notion markup, SQL/code blocks, URLs, and English text — only French passages are
@@ -164,9 +167,9 @@ uv run uvicorn embedding_server:app --port 8001 --reload
 docker-compose up -d
 curl http://localhost:9200/_cluster/health   # wait for green/yellow
 
-# 2. KB Articles — scrape, filter, optionally translate, then index
+# 2. KB Articles — scrape, clean, optionally translate, then index
 uv run python indexer/scrape_notion.py
-uv run python indexer/filter_empty_articles.py
+uv run python indexer/clean_articles.py
 uv run python indexer/translate_articles.py  # optional: translate French → English
 uv run python indexer/build_index.py
 

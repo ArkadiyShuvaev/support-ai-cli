@@ -1,7 +1,7 @@
 """
 translate_articles.py — Detect and translate French sentences in Notion KB articles.
 
-Reads:  data/interim/notion_articles/notion_kb_filtered.json
+Reads:  data/interim/notion_articles/notion_kb_cleaned.json
 Writes: data/interim/notion_articles/notion_kb_translated.json
 
 Strategy: AWS Bedrock (Converse API) per article.
@@ -25,7 +25,7 @@ logger = get_logger(__name__, log_file="translate_articles")
 load_dotenv(find_dotenv())
 
 _INTERIM_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "interim", "notion_articles")
-_IN_PATH = os.path.join(_INTERIM_DIR, "notion_kb_filtered.json")
+_IN_PATH = os.path.join(_INTERIM_DIR, "notion_kb_cleaned.json")
 _OUT_PATH = os.path.join(_INTERIM_DIR, "notion_kb_translated.json")
 
 _AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
