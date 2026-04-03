@@ -29,8 +29,7 @@ _IN_PATH = os.path.join(_INTERIM_DIR, "notion_kb_filtered.json")
 _OUT_PATH = os.path.join(_INTERIM_DIR, "notion_kb_translated.json")
 
 _AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
-# _MODEL_ID = os.environ.get("AWS_MODEL_ID", "anthropic.claude-haiku-4-5-20251001")
-_MODEL_ID = "anthropic.claude-haiku-4-5-20251001"
+_MODEL_ID = os.environ.get("AWS_MODEL_TRANSLATION_ID", "eu.amazon.nova-lite-v1:0")
 
 _SYSTEM_PROMPT = (
     "You are a technical translator. Your only task is to identify French text and translate it to English.\n"

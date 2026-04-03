@@ -67,10 +67,10 @@ uv run python indexer/translate_articles.py
 
 **Environment variables:**
 
-| Variable        | Default                                    | Description                        |
-| --------------- | ------------------------------------------ | ---------------------------------- |
-| `AWS_REGION`    | `us-east-1`                                | AWS region for Bedrock             |
-| `AWS_MODEL_ID`  | `anthropic.claude-haiku-4-5-20251001`      | Bedrock model used for translation |
+| Variable                   | Default                      | Description                              |
+| -------------------------- | ---------------------------- | ---------------------------------------- |
+| `AWS_REGION`               | `us-east-1`                  | AWS region for Bedrock                   |
+| `AWS_MODEL_TRANSLATION_ID` | `eu.amazon.nova-lite-v1:0`   | Bedrock model used for translation       |
 
 ---
 
