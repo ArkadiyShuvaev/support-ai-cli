@@ -42,8 +42,8 @@ uv run python indexer/scrape_notion.py
 Detects French sentences in the scraped articles and translates them to English in-place using
 AWS Bedrock (Claude). Skip this step if the KB is already fully in English.
 
-- **Input:** `data/raw/notion_articles/notion_kb_export.json`
-- **Output:** `data/interim/notion_kb_translated.json`
+- **Input:** `data/interim/notion_articles/notion_kb_filtered.json`
+- **Output:** `data/interim/notion_articles/notion_kb_translated.json`
 
 Preserves all Notion markup, SQL/code blocks, URLs, and English text — only French passages are
 replaced.

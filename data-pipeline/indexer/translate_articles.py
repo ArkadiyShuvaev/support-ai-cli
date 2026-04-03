@@ -1,8 +1,8 @@
 """
 translate_articles.py — Detect and translate French sentences in Notion KB articles.
 
-Reads:  data/raw/notion_articles/notion_kb_export.json
-Writes: data/interim/notion_kb_translated.json
+Reads:  data/interim/notion_articles/notion_kb_filtered.json
+Writes: data/interim/notion_articles/notion_kb_translated.json
 
 Strategy: AWS Bedrock (Converse API) per article.
 - LLM identifies French sentences and returns a list of {origin, translated} pairs.
@@ -24,10 +24,8 @@ logger = get_logger(__name__, log_file="translate_articles")
 
 load_dotenv(find_dotenv())
 
-_RAW_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "data", "raw", "notion_articles", "notion_kb_export.json"
-)
-_INTERIM_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "interim")
+_INTERIM_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "interim", "notion_articles")
+_IN_PATH = os.path.join(_INTERIM_DIR, "notion_kb_filtered.json")
 _OUT_PATH = os.path.join(_INTERIM_DIR, "notion_kb_translated.json")
 
 _AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
@@ -75,10 +73,10 @@ def _extract_translations(client, content: str) -> list[dict]:
 
 
 def main() -> None:
-    with open(_RAW_PATH, encoding="utf-8") as f:
+    with open(_IN_PATH, encoding="utf-8") as f:
         articles: list[dict] = json.load(f)
 
-    logger.info("📖 Loaded %d articles from %s", len(articles), _RAW_PATH)
+    logger.info("📖 Loaded %d articles from %s", len(articles), _IN_PATH)
 
     client = boto3.client("bedrock-runtime", region_name=_AWS_REGION)
 
