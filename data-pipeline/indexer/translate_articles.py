@@ -46,15 +46,16 @@ _SYSTEM_PROMPT = (
 )
 
 
-def _extract_translations(client, content: str) -> list[dict]:
+def _extract_translations(client, title: str, content: str) -> list[dict]:
     """
-    Call Bedrock to extract French→English translation pairs from `content`.
+    Call Bedrock to extract French→English translation pairs from `title` and `content`.
     Returns a list of {"origin": ..., "translated": ...} dicts (empty if no French found).
     """
+    text = f"<title>{title}</title>\n<content>{content}</content>"
     response = client.converse(
         modelId=_MODEL_ID,
         system=[{"text": _SYSTEM_PROMPT}],
-        messages=[{"role": "user", "content": [{"text": content}]}],
+        messages=[{"role": "user", "content": [{"text": text}]}],
         inferenceConfig={"maxTokens": 4096, "temperature": 0.1},
     )
 
@@ -87,7 +88,7 @@ def main() -> None:
         content = article.get("content", "")
 
         try:
-            translations = _extract_translations(client, content)
+            translations = _extract_translations(client, title, content)
         except Exception as exc:
             logger.error("[%3d/%d] %s ... ❌ FAILED: %s", idx, len(articles), title[:60], exc)
             translated_articles.append({**article, "translations": []})
