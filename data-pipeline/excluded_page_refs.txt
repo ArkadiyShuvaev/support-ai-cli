@@ -1,0 +1,3 @@
+# Articles to exclude from indexing.
+# One page_ref ID per line. Lines starting with # are comments. Blank lines are ignored.
+2fcf148b3ab780a5a341e23520465869

@@ -39,13 +39,23 @@ uv run python indexer/scrape_notion.py
 
 ### 2. Filter — `indexer/filter_empty_articles.py`
 
-Removes blank pages (tagged `<blank-page>` by the MCP scraper) from the raw export.
+Removes blank pages (tagged `<blank-page>` by the MCP scraper) and any manually excluded articles
+from the raw export.
 
 - **Input:** `data/raw/notion_articles/notion_kb_export.json`
 - **Output:** `data/interim/notion_articles/notion_kb_filtered.json`
 
 ```bash
 uv run python indexer/filter_empty_articles.py
+```
+
+To permanently exclude specific articles, add their `page_ref` IDs (one per line) to
+`excluded_page_refs.txt` at the `data-pipeline/` root:
+
+```
+# Articles to exclude from indexing.
+# One page_ref ID per line. Lines starting with # are comments.
+2fcf148b3ab780a5a341e23520465869
 ```
 
 ---

@@ -10,6 +10,19 @@ RAW_DIR = os.path.join("data", "raw", "notion_articles")
 INTERIM_DIR = os.path.join("data", "interim", "notion_articles")
 INPUT_FILE = os.path.join(RAW_DIR, "notion_kb_export.json")
 OUTPUT_FILE = os.path.join(INTERIM_DIR, "notion_kb_filtered.json")
+EXCLUDED_IDS_FILE = os.path.join(os.path.dirname(__file__), "..", "excluded_page_refs.txt")
+
+
+def _load_excluded_ids() -> set[str]:
+    if not os.path.exists(EXCLUDED_IDS_FILE):
+        return set()
+    with open(EXCLUDED_IDS_FILE, encoding="utf-8") as f:
+        return {
+            line.strip()
+            for line in f
+            if line.strip() and not line.startswith("#")
+        }
+
 
 def filter_empty_pages():
     # 1. Ensure the interim directory exists
@@ -24,13 +37,22 @@ def filter_empty_pages():
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         articles = json.load(f)
 
+    excluded_ids = _load_excluded_ids()
+    if excluded_ids:
+        logger.info("🚫 Loaded %d manually excluded page_ref(s) from %s", len(excluded_ids), EXCLUDED_IDS_FILE)
+
     initial_count = len(articles)
     filtered_articles = []
 
-    # 3. Filter out the empty pages
-    logger.info("🧹 Filtering empty pages...")
+    # 3. Filter out the empty and manually excluded pages
+    logger.info("🧹 Filtering empty and excluded pages...")
     for article in articles:
         content = article.get("content", "")
+        page_ref = article.get("page_ref", "")
+
+        if page_ref in excluded_ids:
+            logger.info("  🚫 Excluded by ID: %s (%s)", article.get("title", "Unknown"), page_ref)
+            continue
 
         # Check for the MCP server's explicit blank page tag
         if "<blank-page>" in content or "This page is blank and has no content." in content:
