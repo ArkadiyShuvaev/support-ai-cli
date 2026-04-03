@@ -18,7 +18,7 @@ from argparse import ArgumentParser
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
 
-from shared.logger import get_logger
+from shared.logger import get_logger, make_subprocess_errlog
 from shared.mcp_client import load_all_server_names, load_server_params
 
 logger = get_logger(__name__, log_file="scrape_mcp_schemas")
@@ -31,7 +31,9 @@ async def _fetch_schemas(server_name: str) -> dict[str, dict]:
     server_params = load_server_params(server_name)
     logger.info("🔌 Connecting to '%s' MCP server...", server_name)
 
-    async with stdio_client(server_params) as (read, write):
+    errlog = make_subprocess_errlog(logger)
+    async with stdio_client(server_params, errlog=errlog) as (read, write):
+        errlog.close_write_end()
         async with ClientSession(read, write) as session:
             await session.initialize()
             logger.info("  ✅ Connected. Fetching tool list...")

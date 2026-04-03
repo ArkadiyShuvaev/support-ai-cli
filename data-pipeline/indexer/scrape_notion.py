@@ -9,7 +9,7 @@ from dotenv import find_dotenv, load_dotenv
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
 
-from shared.logger import get_logger
+from shared.logger import get_logger, make_subprocess_errlog
 from shared.mcp_client import (
     call_tool as _call_tool,
     call_tool_with_retry as _call_tool_with_retry,
@@ -125,7 +125,9 @@ async def _scrape() -> list[dict]:
     articles: list[dict] = []
     parent_id = _extract_page_id(_NOTION_KB_URL)
 
-    async with stdio_client(load_server_params("notion")) as (read, write):
+    errlog = make_subprocess_errlog(logger)
+    async with stdio_client(load_server_params("notion"), errlog=errlog) as (read, write):
+        errlog.close_write_end()
         async with ClientSession(read, write) as session:
             await session.initialize()
             logger.info("✅ Connected to Notion MCP")
