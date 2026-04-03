@@ -10,7 +10,7 @@ logger = get_logger(__name__, log_file="clean_articles")
 RAW_DIR = os.path.join("data", "raw", "notion_articles")
 INTERIM_DIR = os.path.join("data", "interim", "notion_articles")
 INPUT_FILE = os.path.join(RAW_DIR, "notion_kb_export.json")
-OUTPUT_FILE = os.path.join(INTERIM_DIR, "notion_kb_cleaned.json")
+OUTPUT_FILE = os.path.join(INTERIM_DIR, "notion_kb_cleaned.jsonl")
 EXCLUDED_IDS_FILE = os.path.join(os.path.dirname(__file__), "..", "excluded_page_refs.txt")
 
 # Exact strings from the Notion template to strip out
@@ -31,9 +31,9 @@ def _load_excluded_ids() -> set[str]:
         return set()
     with open(EXCLUDED_IDS_FILE, encoding="utf-8") as f:
         return {
-            line.strip()
+            token
             for line in f
-            if line.strip() and not line.startswith("#")
+            if (token := line.split("#")[0].strip()) and not line.startswith("#")
         }
 
 
@@ -70,40 +70,38 @@ def filter_and_clean_pages():
         logger.info("🚫 Loaded %d manually excluded page_ref(s) from %s", len(excluded_ids), EXCLUDED_IDS_FILE)
 
     initial_count = len(articles)
-    cleaned_articles = []
+    kept_count = 0
 
-    # 3. Filter out the empty and manually excluded pages, and clean the rest
+    # 3. Filter out the empty and manually excluded pages, clean the rest, and write incrementally
     logger.info("🧹 Filtering empty pages and cleaning boilerplate...")
-    for article in articles:
-        content = article.get("content", "")
-        page_ref = article.get("page_ref", "")
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as out:
+        for article in articles:
+            content = article.get("content", "")
+            page_ref = article.get("page_ref", "")
 
-        if page_ref in excluded_ids:
-            logger.info("  🚫 Excluded by ID: %s (%s)", article.get("title", "Unknown"), page_ref)
-            continue
+            if page_ref in excluded_ids:
+                logger.info("  🚫 Excluded by ID: %s (%s)", article.get("title", "Unknown"), page_ref)
+                continue
 
-        # Check for the MCP server's explicit blank page tag
-        if "<blank-page>" in content or "This page is blank and has no content." in content:
-            logger.info("  ⏭️  Removed empty page: %s", article.get("title", "Unknown"))
-            continue
+            # Check for the MCP server's explicit blank page tag
+            if "<blank-page>" in content or "This page is blank and has no content." in content:
+                logger.info("  ⏭️  Removed empty page: %s", article.get("title", "Unknown"))
+                continue
 
-        # Clean the content and update the article dictionary
-        cleaned_content = clean_boilerplate(content)
+            # Clean the content and update the article dictionary
+            cleaned_content = clean_boilerplate(content)
 
-        # Failsafe: If the page ONLY contained boilerplate and is now empty, skip it
-        if not cleaned_content:
-            logger.info("  ⏭️  Removed page (only contained boilerplate): %s", article.get("title", "Unknown"))
-            continue
+            # Failsafe: If the page ONLY contained boilerplate and is now empty, skip it
+            if not cleaned_content:
+                logger.info("  ⏭️  Removed page (only contained boilerplate): %s", article.get("title", "Unknown"))
+                continue
 
-        article["content"] = cleaned_content
-        cleaned_articles.append(article)
-
-    # 4. Save the cleaned data to the interim folder
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(cleaned_articles, f, indent=2, ensure_ascii=False)
+            article["content"] = cleaned_content
+            out.write(json.dumps(article, ensure_ascii=False) + "\n")
+            kept_count += 1
 
     logger.info("✅ Cleaning complete!")
-    logger.info("📊 Processed %d articles -> Kept %d valid, sanitized articles.", initial_count, len(cleaned_articles))
+    logger.info("📊 Processed %d articles -> Kept %d valid, sanitized articles.", initial_count, kept_count)
     logger.info("💾 Saved clean dataset to %s", OUTPUT_FILE)
 
 

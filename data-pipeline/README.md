@@ -46,7 +46,7 @@ Filters and sanitizes the raw export:
 - Collapses excessive whitespace left behind by removed tags
 
 - **Input:** `data/raw/notion_articles/notion_kb_export.json`
-- **Output:** `data/interim/notion_articles/notion_kb_cleaned.json`
+- **Output:** `data/interim/notion_articles/notion_kb_cleaned.jsonl`
 
 ```bash
 uv run python indexer/clean_articles.py
@@ -57,8 +57,8 @@ To permanently exclude specific articles, add their `page_ref` IDs (one per line
 
 ```
 # Articles to exclude from indexing.
-# One page_ref ID per line. Lines starting with # are comments.
-2fcf148b3ab780a5a341e23520465869
+# Inline comments are supported: <id>  # reason
+2fcf148b3ab780a5a341e23520465869  # Homepage nav page — too generic
 ```
 
 ---
@@ -68,11 +68,12 @@ To permanently exclude specific articles, add their `page_ref` IDs (one per line
 Detects French sentences in the scraped articles and translates them to English in-place using
 AWS Bedrock (Claude). Skip this step if the KB is already fully in English.
 
-- **Input:** `data/interim/notion_articles/notion_kb_cleaned.json`
-- **Output:** `data/interim/notion_articles/notion_kb_translated.json`
+- **Input:** `data/interim/notion_articles/notion_kb_cleaned.jsonl`
+- **Output:** `data/interim/notion_articles/notion_kb_translated.jsonl`
 
 Preserves all Notion markup, SQL/code blocks, URLs, and English text — only French passages are
-replaced.
+replaced. If interrupted, re-running the script resumes from where it left off (already-translated
+articles in the output file are skipped).
 
 ```bash
 uv run python indexer/translate_articles.py

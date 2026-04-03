@@ -1,4 +1,6 @@
 # Articles to exclude from indexing.
-# One page_ref ID per line. Lines starting with # are comments. Blank lines are ignored.
+# One page_ref ID per line. Blank lines are ignored.
+# Inline comments are supported: <id>  # reason
 2fcf148b3ab780a5a341e23520465869
 a1093e2ca7194f998a1d46ab9112a8b7
+2a2f148b3ab780a2873cf051a1b8dd41 # How to make an incident ticket

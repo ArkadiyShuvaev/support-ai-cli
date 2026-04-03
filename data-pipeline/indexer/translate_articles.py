@@ -6,8 +6,12 @@ Writes: data/interim/notion_articles/notion_kb_translated.json
 
 Strategy: AWS Bedrock (Converse API) per article.
 - LLM identifies French sentences and returns a list of {origin, translated} pairs.
-- Articles with no French text get an empty translations list.
+- Only articles with French content are written to the output file.
 - Output is intended for manual review and in-place replacement.
+
+Resume support: the output file is written line-by-line (JSONL). If the script is interrupted,
+re-running it reads the already-written IDs from the output file and skips those articles,
+picking up from where it left off. To reprocess everything from scratch, delete the output file.
 """
 
 from __future__ import annotations
@@ -25,8 +29,8 @@ logger = get_logger(__name__, log_file="translate_articles")
 load_dotenv(find_dotenv())
 
 _INTERIM_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "interim", "notion_articles")
-_IN_PATH = os.path.join(_INTERIM_DIR, "notion_kb_cleaned.json")
-_OUT_PATH = os.path.join(_INTERIM_DIR, "notion_kb_translated.json")
+_IN_PATH = os.path.join(_INTERIM_DIR, "notion_kb_cleaned.jsonl")
+_OUT_PATH = os.path.join(_INTERIM_DIR, "notion_kb_translated.jsonl")
 
 _AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 _MODEL_ID = os.environ.get("AWS_MODEL_TRANSLATION_ID", "eu.amazon.nova-lite-v1:0")
@@ -72,42 +76,68 @@ def _extract_translations(client, title: str, content: str) -> list[dict]:
     return []
 
 
+def _load_processed_ids(path: str) -> set[str]:
+    """Return IDs of articles already written to the output file (for resume support)."""
+    processed: set[str] = set()
+    if not os.path.exists(path):
+        return processed
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    obj = json.loads(line)
+                    if "id" in obj:
+                        processed.add(obj["id"])
+                except json.JSONDecodeError:
+                    pass
+    return processed
+
+
 def main() -> None:
     with open(_IN_PATH, encoding="utf-8") as f:
-        articles: list[dict] = json.load(f)
+        articles: list[dict] = [json.loads(line) for line in f if line.strip()]
 
     logger.info("📖 Loaded %d articles from %s", len(articles), _IN_PATH)
 
+    processed_ids = _load_processed_ids(_OUT_PATH)
+    resuming = bool(processed_ids)
+    if resuming:
+        logger.info("⏩ Resuming — %d article(s) already processed, skipping.", len(processed_ids))
+
     client = boto3.client("bedrock-runtime", region_name=_AWS_REGION)
 
-    translated_articles: list[dict] = []
+    os.makedirs(_INTERIM_DIR, exist_ok=True)
+    total = len(articles)
+    written_count = len(processed_ids)
     changed_count = 0
 
-    for idx, article in enumerate(articles, 1):
-        title = article.get("title", "")
-        content = article.get("content", "")
+    with open(_OUT_PATH, "a" if resuming else "w", encoding="utf-8") as out:
+        for idx, article in enumerate(articles, 1):
+            article_id = article.get("id", "")
+            title = article.get("title", "")
 
-        try:
-            translations = _extract_translations(client, title, content)
-        except Exception as exc:
-            logger.error("[%3d/%d] %s ... ❌ FAILED: %s", idx, len(articles), title[:60], exc)
-            translated_articles.append({**article, "translations": []})
-            continue
+            if article_id in processed_ids:
+                continue
 
-        if translations:
-            changed_count += 1
-            logger.info("[%3d/%d] %s ... ✅ %d pair(s) found", idx, len(articles), title[:60], len(translations))
-        else:
-            logger.info("[%3d/%d] %s ... ⏭  no French detected", idx, len(articles), title[:60])
+            content = article.get("content", "")
 
-        translated_articles.append({**article, "translations": translations})
+            try:
+                translations = _extract_translations(client, title, content)
+            except Exception as exc:
+                logger.error("[%3d/%d] %s ... ❌ FAILED: %s", idx, total, title[:60], exc)
+                translations = []
 
-    os.makedirs(_INTERIM_DIR, exist_ok=True)
-    with open(_OUT_PATH, "w", encoding="utf-8") as f:
-        json.dump(translated_articles, f, indent=2, ensure_ascii=False)
+            if translations:
+                changed_count += 1
+                logger.info("[%3d/%d] %s ... ✅ %d pair(s) found", idx, total, title[:60], len(translations))
+                out.write(json.dumps({**article, "translations": translations}, ensure_ascii=False) + "\n")
+                out.flush()
+                written_count += 1
+            else:
+                logger.info("[%3d/%d] %s ... ⏭  no French detected", idx, total, title[:60])
 
-    logger.info("💾 Saved %d articles to %s", len(translated_articles), _OUT_PATH)
-    logger.info("   %d article(s) had French content detected.", changed_count)
+    logger.info("💾 Saved %d article(s) with French content to %s", written_count, _OUT_PATH)
 
 
 if __name__ == "__main__":
