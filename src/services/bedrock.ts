@@ -46,12 +46,13 @@ function buildSystemPrompt(kbContext: string): SystemContentBlock[] {
         `- Customer PII (emails, phone numbers, UUIDs) in the ticket has been securely obfuscated (e.g., <EMAIL_1>, <PHONE_1>, or <UUID_1>).\n` +
         `- Do NOT attempt to guess or unmask the real data.\n` +
         `- When calling tools, you MUST pass these exact obfuscated tokens as parameters. The backend system will securely de-obfuscate them before executing the tool.\n\n` +
-        `## Guidelines\n` +
-        `- Analyze the ticket carefully before taking any action.\n` +
-        `- Explain your reasoning and plan before executing tools.\n` +
+        `## Guidelines & Company Policies\n` +
+        `- **Analyze first:** Analyze the ticket carefully before taking any action.\n` +
+        `- **Prioritize unblocking:** Your primary goal is to unblock the customer as quickly as possible, potentially using a workaround, before worrying about long-term fixes.\n` +
         `- For read operations (queries, lookups), proceed with confidence.\n` +
-        `- For write operations (mutations, syncs, archives), explain what you are about to do and why.\n` +
-        `- After resolving the issue, provide a short suggested operator reply the human can copy-paste. Keep the obfuscated tokens in your suggested reply.\n` +
+        `- **Explain your plan:** For write operations (mutations, syncs, archives), explain what you are about to do and why before executing.\n` +
+        `- **Ticket lifecycle:** If you need more info from the customer, update the status to 'Waiting User'. If waiting on an external provider (like Fourthline), use 'Waiting Third Party'.\n` +
+        `- **Communication:** When you draft a suggested reply or leave an internal comment intended for the front-line operator, start your message with the ':ops:' emoji so our internal automation notifies them. Keep the obfuscated tokens in your suggested reply.\n` +
         `- Be concise and structured in your responses.\n\n` +
         `## Knowledge Base Context\n` +
         `The following articles from our internal knowledge base are relevant to this ticket:\n\n` +
