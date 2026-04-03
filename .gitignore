@@ -4,6 +4,6 @@ coverage/*
 *.log
 *.tmp
 *.env
-data-pipeline/data/raw/
+data-pipeline/data/
 docs/examples/
 .env

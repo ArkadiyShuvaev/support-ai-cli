@@ -37,7 +37,20 @@ uv run python indexer/scrape_notion.py
 
 ---
 
-### 2. Translate — `indexer/translate_articles.py` _(optional)_
+### 2. Filter — `indexer/filter_empty_articles.py`
+
+Removes blank pages (tagged `<blank-page>` by the MCP scraper) from the raw export.
+
+- **Input:** `data/raw/notion_articles/notion_kb_export.json`
+- **Output:** `data/interim/notion_articles/notion_kb_filtered.json`
+
+```bash
+uv run python indexer/filter_empty_articles.py
+```
+
+---
+
+### 3. Translate — `indexer/translate_articles.py` _(optional)_
 
 Detects French sentences in the scraped articles and translates them to English in-place using
 AWS Bedrock (Claude). Skip this step if the KB is already fully in English.
@@ -61,10 +74,9 @@ uv run python indexer/translate_articles.py
 
 ---
 
-### 3. Index — `indexer/build_index.py`
+### 4. Index — `indexer/build_index.py`
 
-Reads `data/raw/notion_articles/*.json` (or `data/interim/notion_kb_translated.json` if you ran
-the translate step), generates multilingual embeddings with
+Reads `data/raw/notion_articles/*.json`, generates multilingual embeddings with
 `distiluse-base-multilingual-cased-v1`, and bulk-loads into the `support-cli-kb` OpenSearch index.
 Idempotent — deletes and recreates the index on each run.
 
@@ -100,7 +112,7 @@ curl -s "http://localhost:9200/support-cli-kb/_search?q=user" | python3 -m json.
 Used by the TS orchestrator at runtime (Step 6 of the flow diagram) to semantically match
 the agent's investigation plan against available MCP tools.
 
-### 4. Scrape — `indexer/scrape_mcp_schemas.py`
+### 5. Scrape — `indexer/scrape_mcp_schemas.py`
 
 Connects to each MCP server listed in `mcp-servers.json` and saves all tool schemas to
 `data/raw/mcp_schemas/{server_name}.json`.
@@ -112,7 +124,7 @@ uv run python indexer/scrape_mcp_schemas.py --servers linear notion   # subset
 
 ---
 
-### 5. Index — `indexer/build_schema_index.py`
+### 6. Index — `indexer/build_schema_index.py`
 
 Reads `data/raw/mcp_schemas/*.json`, generates embeddings, and bulk-loads into the
 `support-cli-tools` OpenSearch index. Idempotent.
@@ -142,8 +154,9 @@ uv run uvicorn embedding_server:app --port 8001 --reload
 docker-compose up -d
 curl http://localhost:9200/_cluster/health   # wait for green/yellow
 
-# 2. KB Articles — scrape, optionally translate, then index
+# 2. KB Articles — scrape, filter, optionally translate, then index
 uv run python indexer/scrape_notion.py
+uv run python indexer/filter_empty_articles.py
 uv run python indexer/translate_articles.py  # optional: translate French → English
 uv run python indexer/build_index.py
 
