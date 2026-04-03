@@ -38,3 +38,23 @@ Nova Lite is the right trade-off: it handles technical French (fintech jargon, m
 ## Region
 
 All models use the `eu-central-1` region (`AWS_REGION`) with the `eu.` cross-region inference prefix, keeping data within the EU.
+
+---
+
+## Documentation Maintenance
+
+After every update to models, prompts, tools, or agent behavior, decide whether the change is **major** and warrants updating this file.
+
+**Major changes** (update this file):
+- Updating existing functionality
+- Adding new functions or tools (including MCP tools)
+- Renaming files that affect imports, configuration, or agent wiring
+- Changing environment variables that control agent behavior (`AWS_MODEL_ID`, `AWS_REGION`, etc.)
+- Modifying the system prompt
+- Adding or removing a model / agent role
+- Changing the AWS region or inference prefix
+
+**Minor changes** (no update needed):
+- Prompt wording tweaks with no behavioral impact
+- Internal refactors that don't affect model selection or agent logic
+- Dependency or tooling upgrades unrelated to AI behavior
