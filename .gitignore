@@ -8,3 +8,4 @@ data-pipeline/data/
 docs/examples/
 .env
 data-pipeline/excluded_page_refs.conf
+notes/
