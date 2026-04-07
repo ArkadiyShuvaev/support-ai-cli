@@ -53,7 +53,7 @@ uv run python indexer/clean_articles.py
 ```
 
 To permanently exclude specific articles, add their `page_ref` IDs (one per line) to
-`excluded_page_refs.txt` at the `data-pipeline/` root:
+`excluded_page_refs.conf` at the `data-pipeline/` root:
 
 ```
 # Articles to exclude from indexing.

@@ -11,7 +11,7 @@ RAW_DIR = os.path.join("data", "raw", "notion_articles")
 INTERIM_DIR = os.path.join("data", "interim", "notion_articles")
 INPUT_FILE = os.path.join(RAW_DIR, "notion_kb_export.json")
 OUTPUT_FILE = os.path.join(INTERIM_DIR, "notion_kb_cleaned.jsonl")
-EXCLUDED_IDS_FILE = os.path.join(os.path.dirname(__file__), "..", "excluded_page_refs.txt")
+EXCLUDED_IDS_FILE = os.path.join(os.path.dirname(__file__), "..", "excluded_page_refs.conf")
 
 # Exact strings from the Notion template to strip out
 BOILERPLATE_STRINGS = [
@@ -28,6 +28,7 @@ BOILERPLATE_STRINGS = [
 
 def _load_excluded_ids() -> set[str]:
     if not os.path.exists(EXCLUDED_IDS_FILE):
+        logger.info("ℹ️  No exclusions file found at %s — skipping manual exclusions", EXCLUDED_IDS_FILE)
         return set()
     with open(EXCLUDED_IDS_FILE, encoding="utf-8") as f:
         return {
